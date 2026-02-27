@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import base64, time
+import base64
 from pathlib import Path
 
 from utils.io import load_customer_file
@@ -26,25 +26,19 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 # ============================================================
-# THEME + STYLING
+# THEME
 # ============================================================
 def apply_theme():
     st.markdown("""
     <style>
-    html, body, [class*="css"] {
-        color: white !important;
-    }
+    html, body, [class*="css"] { color: white !important; }
+    h1,h2,h3,h4,h5,h6,p,span,label,div { color: white !important; }
 
-    h1,h2,h3,h4,h5,h6,p,span,label,div {
-        color: white !important;
-    }
-
-    input, textarea {
+    input {
         color: white !important;
         background-color: #1e1e1e !important;
     }
 
-    /* Pill buttons */
     button:not(div.modebar button) {
         background-color: black !important;
         color: white !important;
@@ -53,47 +47,16 @@ def apply_theme():
         padding: 10px 22px !important;
     }
 
-    /* Pill tabs */
-    div[data-baseweb="tab-list"] {
-        gap: 12px;
-    }
-
-    div[data-baseweb="tab-list"] button {
-        border-radius: 999px !important;
-        padding: 10px 24px !important;
-        background-color: #111 !important;
-        color: white !important;
-        border: 1px solid #555 !important;
-    }
-
-    div[data-baseweb="tab-list"] button[aria-selected="true"] {
-        background-color: black !important;
-        border: 2px solid white !important;
-    }
-
-    div[data-baseweb="tab-highlight"] {
-        display: none !important;
-    }
-
-    /* Plotly toolbar normal */
-    div.modebar button {
-        border-radius: 6px !important;
-        padding: 4px 6px !important;
-        background-color: #222 !important;
-    }
-
-    .stApp {
-        background-color: #0e1117;
-    }
+    .stApp { background-color: #0e1117; }
     </style>
     """, unsafe_allow_html=True)
 
 apply_theme()
 
 # ============================================================
-# BACKGROUND IMAGE
+# BACKGROUND
 # ============================================================
-def set_background(image_path: str, dim: float = 0.7):
+def set_background(image_path: str, dim: float = 0.6):
     p = Path(image_path)
     if not p.exists():
         return
@@ -119,7 +82,7 @@ def set_background(image_path: str, dim: float = 0.7):
     """, unsafe_allow_html=True)
 
 # ============================================================
-# NAV BAR
+# NAVIGATION
 # ============================================================
 def nav_bar():
     col1, col2, col3 = st.columns([4,1,1])
@@ -131,6 +94,9 @@ def nav_bar():
         if st.button("📊 Predict"):
             st.session_state.page = "predict"
             st.rerun()
+        if st.button("🔮 Simulator"):
+            st.session_state.page = "simulator"
+            st.rerun()
 
     with col3:
         if st.button("🚪 Logout"):
@@ -139,41 +105,10 @@ def nav_bar():
             st.rerun()
 
 # ============================================================
-# BUSINESS LABELING
-# ============================================================
-def get_segment_labels(df_results):
-    cluster_stats = df_results.groupby("Cluster").agg({
-        "Monetary": "mean",
-        "Recency": "mean",
-        "Frequency": "mean"
-    }).reset_index()
-
-    labels = {}
-
-    loyal_cluster = cluster_stats.sort_values("Monetary", ascending=False).iloc[0]["Cluster"]
-    labels[loyal_cluster] = "💎 High-Value Loyal"
-
-    remaining = cluster_stats[cluster_stats["Cluster"] != loyal_cluster]
-    at_risk_cluster = remaining.sort_values("Recency", ascending=False).iloc[0]["Cluster"]
-    labels[at_risk_cluster] = "⚠️ At-Risk / Churning"
-
-    remaining = remaining[remaining["Cluster"] != at_risk_cluster]
-    recent_cluster = remaining.sort_values("Recency", ascending=True).iloc[0]["Cluster"]
-    labels[recent_cluster] = "🌱 Recent Low Spenders"
-
-    remaining = remaining[remaining["Cluster"] != recent_cluster]
-    if not remaining.empty:
-        bulk_cluster = remaining.iloc[0]["Cluster"]
-        labels[bulk_cluster] = "🛒 Bulk/Average Buyers"
-
-    return labels
-
-# ============================================================
 # LOGIN PAGE
 # ============================================================
 def login_page():
     set_background("bgl.jpg",0.4)
-
     st.markdown("<h1 style='text-align:center;'>🔐 Admin Login</h1>", unsafe_allow_html=True)
 
     with st.form("login"):
@@ -183,8 +118,6 @@ def login_page():
             if u == "admin" and p == "12345":
                 st.session_state.logged_in = True
                 st.session_state.page = "home"
-                st.success("Login successful")
-                time.sleep(0.3)
                 st.rerun()
             else:
                 st.error("Invalid credentials")
@@ -195,14 +128,10 @@ def login_page():
 def home_page():
     set_background("bgh.jpg",0.3)
     nav_bar()
-
     st.markdown("""
     <h1 style="text-align:center; margin-top:120px;">
-        🛍️ AI Customer Segmentation System
+        🛍️ AI-Powered Customer Intelligence System
     </h1>
-    <p style="text-align:center;">
-        Upload your sales data and discover Loyal, At-Risk and New customers.
-    </p>
     """, unsafe_allow_html=True)
 
 # ============================================================
@@ -212,95 +141,165 @@ def predict_page():
     set_background("bgc.jpg",0.6)
     nav_bar()
 
-    st.markdown("<h2 style='text-align:center;'>📊 Customer Segmentation Predictor</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'>📊 Portfolio-Level Segmentation Analysis</h2>", unsafe_allow_html=True)
 
-    # REQUIRED COLUMNS INFO
-    st.info("""
-    ### 📂 Required Columns in Uploaded File
-    Your CSV/Excel file **must contain** the following columns:
-
-    - **InvoiceNo** – Invoice ID  
-    - **StockCode** – Product ID  
-    - **Description** – Product Name  
-    - **Quantity** – Units sold  
-    - **InvoiceDate** – Transaction date  
-    - **UnitPrice** – Price per unit  
-    - **CustomerID** – Unique customer ID  
-    """)
-
-    uploaded_file = st.file_uploader("Upload Transaction History", type=["csv","xlsx","xls"])
+    uploaded_file = st.file_uploader("Upload Customer Transaction Dataset", type=["csv","xlsx","xls"])
 
     if uploaded_file is None:
-        st.info("👆 Please upload your transaction file to begin.")
         return
 
     raw_df = load_customer_file(uploaded_file)
 
-    st.write(f"**Data Loaded:** {raw_df.shape[0]:,} rows")
-
-    with st.expander("🔍 Preview Raw Data"):
-        st.dataframe(raw_df.head())
-
-    if st.button("🚀 Analyze Segments"):
-        with st.spinner("Analyzing data..."):
+    if st.button("🚀 Run Segmentation Analysis"):
+        with st.spinner("Processing dataset..."):
             predictor = BatchPredictor()
             results_df = predictor.predict(raw_df)
 
-            segment_map = get_segment_labels(results_df)
-            results_df["Segment Name"] = results_df["Cluster"].map(segment_map)
+        st.success("Segmentation Completed Successfully!")
+        st.dataframe(results_df.head())
 
-        st.success("Analysis Complete!")
+        st.markdown("## 📈 Customer Distribution Overview")
+        segment_counts = results_df["Segment"].value_counts()
+        st.write(segment_counts)
 
-        tab1, tab2, tab3 = st.tabs(["📊 Business Insights","📈 Visualizations","📥 Export Data"])
+        fig = px.pie(
+            values=segment_counts.values,
+            names=segment_counts.index,
+            title="Segment Composition"
+        )
+        st.plotly_chart(fig)
 
-        with tab1:
-            summary = results_df.groupby("Segment Name").agg({
-                "CustomerID":"count",
-                "Monetary":"mean",
-                "Recency":"mean",
-                "Frequency":"mean"
-            }).rename(columns={"CustomerID":"Count"})
-            st.dataframe(summary)
+# ============================================================
+# SIMULATOR PAGE
+# ============================================================
+def simulator_page():
+    set_background("bgc.jpg",0.6)
+    nav_bar()
 
-            st.markdown("""
-            ### 💡 Interpretation Guide
-            - **💎 High-Value Loyal:** VIP customers, high spend & frequent visits  
-            - **🛒 Bulk/Average:** Regular shoppers  
-            - **🌱 Recent Low Spenders:** New or small buyers  
-            - **⚠️ At-Risk:** Long time since last purchase
+    st.markdown("<h2 style='text-align:center;'>🔮 Individual Customer Scenario Simulator</h2>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        recency = st.number_input("Days Since Last Purchase", min_value=0, value=30)
+        frequency = st.number_input("Total Transactions", min_value=1, value=5)
+        monetary = st.number_input("Total Revenue Generated (₹)", min_value=0.0, value=1000.0)
+        total_quantity = st.number_input("Total Units Purchased", min_value=0, value=20)
+        unique_products = st.number_input("Distinct Products Purchased", min_value=0, value=5)
+
+        predict_btn = st.button("🔍 Evaluate Customer Profile")
+
+    with col2:
+        st.markdown("""
+        ### 📘 Metric Explanation
+        - Recency → Engagement freshness  
+        - Frequency → Purchase consistency  
+        - Monetary → Revenue contribution  
+        - Quantity → Purchase volume  
+        - Unique products → Buying diversity  
+        """)
+
+    if predict_btn:
+        with st.spinner("Evaluating profile..."):
+            predictor = BatchPredictor()
+
+            input_df = pd.DataFrame({
+                "Recency": [recency],
+                "Frequency": [frequency],
+                "Monetary": [monetary],
+                "TotalQuantity": [total_quantity],
+                "UniqueProducts": [unique_products]
+            })
+
+            scaled = predictor.scaler.transform(input_df)
+            cluster = predictor.kmeans.predict(scaled)[0]
+
+        segment_map = {
+            0: "High Value Loyal",
+            1: "Loyal Customers",
+            2: "At Risk Customers",
+            3: "New Customers"
+        }
+
+        segment = segment_map.get(cluster, "Unidentified Segment")
+
+        st.success("Customer Evaluation Complete")
+
+        st.markdown(f"""
+        ### 🎯 Customer Classification
+        **Segment Identified:** {segment}
+        """)
+
+        st.markdown("## 📌 Recommended Strategic Action")
+
+        if segment == "High Value Loyal":
+            st.info("""
+            ### 🌟 High Value Loyal Customers – Premium Retention Strategy
+
+            **Profile Insight:**  
+            Highest revenue contributors with strong engagement.
+
+            **Strategic Actions:**
+            - Exclusive VIP tiers
+            - Early product launches
+            - Personalized concierge service
+            - Referral multipliers
+            - Surprise loyalty bonuses
+
+            **Business Objective:**  
+            Maximize Customer Lifetime Value (CLV).
             """)
 
-        with tab2:
-            col1, col2 = st.columns(2)
+        elif segment == "Loyal Customers":
+            st.info("""
+            ### 🔁 Loyal Customers – Growth Acceleration Strategy
 
-            with col1:
-                fig1 = px.scatter(
-                    results_df,
-                    x="Monetary",
-                    y="Frequency",
-                    color="Segment Name",
-                    hover_data=["CustomerID"],
-                    title="Customer Value vs Frequency"
-                )
-                st.plotly_chart(fig1, use_container_width=True)
+            **Profile Insight:**  
+            Consistent purchasers with moderate revenue.
 
-            with col2:
-                fig2 = px.box(
-                    results_df,
-                    x="Segment Name",
-                    y="Recency",
-                    color="Segment Name",
-                    title="Recency by Segment"
-                )
-                st.plotly_chart(fig2, use_container_width=True)
+            **Strategic Actions:**
+            - Bundle pricing
+            - Cross-selling
+            - Cashback campaigns
+            - Subscription models
 
-        with tab3:
-            csv = results_df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "Download Full Report (CSV)",
-                csv,
-                "segmented_customers.csv"
-            )
+            **Business Objective:**  
+            Increase average order value.
+            """)
+
+        elif segment == "At Risk Customers":
+            st.warning("""
+            ### ⚠️ At Risk Customers – Reactivation Strategy
+
+            **Profile Insight:**  
+            Declining engagement signals churn risk.
+
+            **Strategic Actions:**
+            - Win-back discounts
+            - Personalized re-engagement emails
+            - Feedback surveys
+            - Remarketing ads
+
+            **Business Objective:**  
+            Reduce churn and recover revenue.
+            """)
+
+        elif segment == "New Customers":
+            st.success("""
+            ### 🚀 New Customers – Onboarding Strategy
+
+            **Profile Insight:**  
+            Recently acquired customers.
+
+            **Strategic Actions:**
+            - Onboarding email sequence
+            - Second-purchase incentives
+            - Best-seller recommendations
+            - Loyalty enrollment
+
+            **Business Objective:**  
+            Convert into repeat buyers quickly.
+            """)
 
 # ============================================================
 # ROUTER
@@ -311,5 +310,7 @@ elif st.session_state.page == "home":
     home_page()
 elif st.session_state.page == "predict":
     predict_page()
+elif st.session_state.page == "simulator":
+    simulator_page()
 else:
     home_page()
